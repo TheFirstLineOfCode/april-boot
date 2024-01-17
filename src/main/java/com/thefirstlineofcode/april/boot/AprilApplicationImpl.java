@@ -8,6 +8,7 @@ import org.springframework.core.io.ResourceLoader;
 
 public class AprilApplicationImpl extends SpringApplication {
 	private Path applicationHome;
+	private AprilFlowers flowers;
 	
 	public AprilApplicationImpl(Path applicationHome, Class<?>... primarySources) {
 		this(applicationHome, null, primarySources);
@@ -29,10 +30,17 @@ public class AprilApplicationImpl extends SpringApplication {
 	
 	@Override
 	public ConfigurableApplicationContext run(String... args) {
+		flowers = new AprilFlowers(this, args);
+		
 		return super.run(args);
 	}
 	
 	public Path getApplicationHome() {
 		return applicationHome;
+	}
+	
+	protected void postProcessApplicationContext(ConfigurableApplicationContext context) {
+		super.postProcessApplicationContext(context);
+		flowers.bloom(context);
 	}
 }

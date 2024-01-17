@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.StringTokenizer;
 
 import org.pf4j.AbstractPluginManager;
 import org.pf4j.PluginManager;
@@ -16,10 +17,8 @@ import org.pf4j.RuntimeMode;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.boot.ApplicationArguments;
-import org.springframework.boot.ConfigurableBootstrapContext;
 import org.springframework.boot.DefaultApplicationArguments;
 import org.springframework.boot.SpringApplication;
-import org.springframework.boot.SpringApplicationRunListener;
 import org.springframework.boot.origin.OriginTrackedValue;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.AnnotationConfigRegistry;
@@ -32,10 +31,10 @@ import ch.qos.logback.classic.joran.JoranConfigurator;
 import ch.qos.logback.core.joran.spi.JoranException;
 import ch.qos.logback.core.util.StatusPrinter;
 
-public class ApplicationListener implements SpringApplicationRunListener {
+public class AprilFlowers {
 	private static final String PROPERTY_NAME_APRIL_APPLICATION_LOG_LEVEL = "april.application.logLevel";
 	private static final String PROPERTY_NAME_APRIL_APPLICATION_DISABLED_PLUGINS = "april.application.disabledPlugins";
-	private static final String OPTION_NAME_PLUGINS_DIRECTORY = "plugins-directory";
+	private static final String OPTION_NAME_PLUGINS_DIRECTORIES = "plugins-directories";
 	private static final String DEFAULT_PLUGINS_DIRECTORY_NAME = "plugins";
 	private static final String OPTION_NAME_RUNTIME_MODE = "runtime-mode";
 	
@@ -47,7 +46,7 @@ public class ApplicationListener implements SpringApplicationRunListener {
 	private RuntimeMode runtimeMode;
 	private String[] disabledPlugins;
 	
-	public ApplicationListener(SpringApplication application, String[] args) {
+	public AprilFlowers(SpringApplication application, String[] args) {
 		if (!(application instanceof AprilApplicationImpl))
 			throw new RuntimeException(String.format("'%s' must be a AprilApplicationImpl instance.", application));
 		
@@ -55,7 +54,7 @@ public class ApplicationListener implements SpringApplicationRunListener {
 		
 		noPlugins = false;
 		ApplicationArguments applicationArguments = new DefaultApplicationArguments(args);
-		List<String> pluginsDirectoriesOptionValues = applicationArguments.getOptionValues(OPTION_NAME_PLUGINS_DIRECTORY);
+		List<String> pluginsDirectoriesOptionValues = applicationArguments.getOptionValues(OPTION_NAME_PLUGINS_DIRECTORIES);
 		
 		if (pluginsDirectoriesOptionValues == null) {
 			try {
@@ -97,16 +96,31 @@ public class ApplicationListener implements SpringApplicationRunListener {
 	}
 	
 	private Path[] getPluginsDirectories(List<String> sPluginDirectories) {
-		Path[] pluginsDirectories = new Path[sPluginDirectories.size()];
+		List<Path> pluginsDirectories = new ArrayList<>();
 		for (int i = 0; i < sPluginDirectories.size(); i++) {
-			pluginsDirectories[i] = Path.of(sPluginDirectories.get(i));
+			pluginsDirectories.addAll(getPluginDirectories(sPluginDirectories.get(i)));
 		}
 		
-		return pluginsDirectories;
+		return pluginsDirectories.toArray(new Path[pluginsDirectories.size()]);
 	}
 
-	@Override
-	public void contextPrepared(ConfigurableApplicationContext appContext) {
+	private List<Path> getPluginDirectories(String pluginDirectories) {
+		StringTokenizer st = new StringTokenizer(pluginDirectories, ",");
+		
+		List<Path> paths = new ArrayList<>();
+		while (st.hasMoreTokens()) {
+			paths.add(Path.of(st.nextToken()));
+		}
+		
+		return paths;
+	}
+
+	public void bloom(ConfigurableApplicationContext appContext) {
+		processEnvironment(appContext.getEnvironment());
+		processApplicationContext(appContext);
+	}
+
+	private void processApplicationContext(ConfigurableApplicationContext appContext) {
 		AnnotationConfigRegistry configRegistry = (AnnotationConfigRegistry)appContext;
 		registerSystemConfigurations(configRegistry);
 		
@@ -179,9 +193,7 @@ public class ApplicationListener implements SpringApplicationRunListener {
 		configRegistry.register(BootConfiguration.class);
 	}
 	
-	@Override
-	public void environmentPrepared(ConfigurableBootstrapContext bootstrapContext,
-				ConfigurableEnvironment environment) {
+	protected void processEnvironment(ConfigurableEnvironment environment) {
 		Iterator<PropertySource<?>> propertySourcesIter  = environment.getPropertySources().iterator();
 		while (propertySourcesIter.hasNext()) {
 			PropertySource<?> propertySource = propertySourcesIter.next();
