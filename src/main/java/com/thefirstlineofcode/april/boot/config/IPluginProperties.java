@@ -1,6 +1,6 @@
 package com.thefirstlineofcode.april.boot.config;
 
-public interface IConfigurationProperties {	
+public interface IPluginProperties {	
 	Boolean getBoolean(String name);
 	Boolean getBoolean(String name, Boolean defaultValue);
 	Integer getInteger(String name);

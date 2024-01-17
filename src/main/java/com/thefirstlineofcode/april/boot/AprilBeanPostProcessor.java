@@ -11,9 +11,9 @@ import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.boot.origin.OriginTrackedValue;
 
-import com.thefirstlineofcode.april.boot.config.ConfigurationProperties;
-import com.thefirstlineofcode.april.boot.config.IConfigurationProperties;
-import com.thefirstlineofcode.april.boot.config.IConfigurationPropertiesAware;
+import com.thefirstlineofcode.april.boot.config.PluginProperties;
+import com.thefirstlineofcode.april.boot.config.IPluginProperties;
+import com.thefirstlineofcode.april.boot.config.IPluginPropertiesAware;
 
 public class AprilBeanPostProcessor implements BeanPostProcessor {
 	private static final String APRIL_PLUGINS_PREFIX = "april.plugins";
@@ -21,7 +21,7 @@ public class AprilBeanPostProcessor implements BeanPostProcessor {
 	private Path applicationHome;
 	private Map<String, Object> applicationProperties;
 	private AprilPluginManager pluginManager;
-	private Map<String, IConfigurationProperties> pluginIdToConfigurationProperties;
+	private Map<String, IPluginProperties> pluginIdToPluginProperties;
 
 	
 	public AprilBeanPostProcessor(Path applicationHome, Map<String, Object> applicationProperties, AprilPluginManager pluginManager) {
@@ -29,7 +29,7 @@ public class AprilBeanPostProcessor implements BeanPostProcessor {
 		this.applicationProperties = applicationProperties;
 		this.pluginManager = pluginManager;
 		
-		pluginIdToConfigurationProperties = new HashMap<>();
+		pluginIdToPluginProperties = new HashMap<>();
 	}
 
 	@Override
@@ -46,20 +46,20 @@ public class AprilBeanPostProcessor implements BeanPostProcessor {
 		if (plugin == null)
 			return bean;
 		
-		if (bean instanceof IConfigurationPropertiesAware) {
-			((IConfigurationPropertiesAware)bean).setConfigurationProperties(getConfigurationProperties(plugin.getPluginId()));
+		if (bean instanceof IPluginPropertiesAware) {
+			((IPluginPropertiesAware)bean).setPluginProperties(getPluginProperties(plugin.getPluginId()));
 		}
 		
 		return bean;
 	}
 
-	private IConfigurationProperties getConfigurationProperties(String pluginId) {
-		IConfigurationProperties configurationProperties = pluginIdToConfigurationProperties.get(pluginId);
-		if (configurationProperties == null) {
+	private IPluginProperties getPluginProperties(String pluginId) {
+		IPluginProperties pluginProperties = pluginIdToPluginProperties.get(pluginId);
+		if (pluginProperties == null) {
 			synchronized (applicationProperties) {
-				configurationProperties = pluginIdToConfigurationProperties.get(pluginId);
-				if (configurationProperties != null)
-					return configurationProperties;
+				pluginProperties = pluginIdToPluginProperties.get(pluginId);
+				if (pluginProperties != null)
+					return pluginProperties;
 				
 				String pluginPropertiesPrefix = String.format("%s.%s.", APRIL_PLUGINS_PREFIX, pluginId);
 				Properties properties = new Properties();
@@ -73,11 +73,11 @@ public class AprilBeanPostProcessor implements BeanPostProcessor {
 					}
 				}
 				
-				configurationProperties = new ConfigurationProperties(properties);
-				pluginIdToConfigurationProperties.put(pluginId, configurationProperties);
+				pluginProperties = new PluginProperties(properties);
+				pluginIdToPluginProperties.put(pluginId, pluginProperties);
 			}
 		}
 		
-		return configurationProperties;
+		return pluginProperties;
 	}
 }

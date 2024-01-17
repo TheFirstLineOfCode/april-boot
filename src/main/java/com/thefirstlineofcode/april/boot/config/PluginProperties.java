@@ -2,14 +2,14 @@ package com.thefirstlineofcode.april.boot.config;
 
 import java.util.Properties;
 
-public class ConfigurationProperties implements IConfigurationProperties {
+public class PluginProperties implements IPluginProperties {
 	protected Properties properties;
 	
-	public ConfigurationProperties() {
+	public PluginProperties() {
 		this(new Properties());
 	}
 	
-	public ConfigurationProperties(Properties properties) {
+	public PluginProperties(Properties properties) {
 		this.properties = properties;
 	}
 
