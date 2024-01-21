@@ -1,14 +1,11 @@
 package com.thefirstlineofcode.april.boot;
 
 
-import java.io.BufferedInputStream;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
 
 import org.pf4j.BasePluginLoader;
 import org.pf4j.PluginClassLoader;
@@ -43,26 +40,11 @@ public class AprilDevelopmentPlguinLoader extends BasePluginLoader {
 	}
 
 	private boolean isPluginJar(File jar) {
-		ZipInputStream zis = null;
 		try {
-			zis = new ZipInputStream(new BufferedInputStream(new FileInputStream(jar)));
-			ZipEntry entry = null;
-			while ((entry = zis.getNextEntry()) != null) {
-				String entryName = entry.getName();
-				if ("plugin.properties".equals(entryName))
-					return true;
-			}
+			Path pluingProperties = FileUtils.getPath(jar.toPath(), "plugin.properties");
+			return Files.exists(pluingProperties);
 		} catch (IOException e) {
-			throw new RuntimeException("Failed to read jar entries.", e);
-		} finally {
-			if (zis != null)
-				try {
-					zis.close();
-				} catch (IOException e) {
-					e.printStackTrace();
-				}
+			return false;
 		}
-		
-		return false;
 	}
 }

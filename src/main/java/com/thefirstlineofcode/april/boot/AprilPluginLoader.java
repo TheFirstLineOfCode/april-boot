@@ -21,7 +21,7 @@ public class AprilPluginLoader extends JarPluginLoader {
 	
 	@Override
 	public ClassLoader loadPlugin(Path pluginPath, PluginDescriptor pluginDescriptor) {		
-		File pluginDependenciesDirectory = pluginDependenciesDirectory(pluginPath, pluginDescriptor);		
+		File pluginDependenciesDirectory = getPluginDependenciesDirectory(pluginPath, pluginDescriptor);		
 		if (pluginDependenciesDirectory == null) {
 			logger.info("Plugin dependencies directory not found. Use default plugin classloader to load plugin.");
 			return super.loadPlugin(pluginPath, pluginDescriptor);
@@ -55,10 +55,10 @@ public class AprilPluginLoader extends JarPluginLoader {
 		return jars.size() != 0 ? jars.toArray(new File[jars.size()]) : null;
 	}
 
-	protected File pluginDependenciesDirectory(Path pluginPath, PluginDescriptor pluginDescriptor) {
+	protected File getPluginDependenciesDirectory(Path pluginPath, PluginDescriptor pluginDescriptor) {
 		String sPluginDependenciesDirectory = String.format("%s-dependencies",
 				pluginDescriptor.getPluginId());
-		Path pPluginDependenciesDirectory = pluginPath.resolve(sPluginDependenciesDirectory);
+		Path pPluginDependenciesDirectory = pluginPath.resolveSibling(sPluginDependenciesDirectory);
 		
 		File pluginDependenciesDirectory = pPluginDependenciesDirectory.toFile();
 		if (pluginDependenciesDirectory.exists() && pluginDependenciesDirectory.isDirectory())

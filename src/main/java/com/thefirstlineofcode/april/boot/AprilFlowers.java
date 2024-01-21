@@ -185,9 +185,7 @@ public class AprilFlowers {
 		return classLoaders.toArray(new ClassLoader[classLoaders.size()]);
 	}
 	
-	protected void registerPredefinedSpringConfigurations(AnnotationConfigRegistry configRegistry) {
-		configRegistry.register(BootConfiguration.class);
-	}
+	protected void registerPredefinedSpringConfigurations(AnnotationConfigRegistry configRegistry) {}
 	
 	protected void registerSystemConfigurations(AnnotationConfigRegistry configRegistry) {
 		configRegistry.register(BootConfiguration.class);
