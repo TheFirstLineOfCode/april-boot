@@ -1,12 +1,14 @@
 package com.thefirstlineofcode.april.boot;
 
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.net.URL;
+import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
+import java.util.Properties;
 import java.util.StringTokenizer;
 
 import org.pf4j.AbstractPluginManager;
@@ -19,12 +21,13 @@ import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.DefaultApplicationArguments;
 import org.springframework.boot.SpringApplication;
-import org.springframework.boot.origin.OriginTrackedValue;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.AnnotationConfigRegistry;
 import org.springframework.core.env.ConfigurableEnvironment;
-import org.springframework.core.env.MapPropertySource;
-import org.springframework.core.env.PropertySource;
+
+import com.thefirstlineofcode.april.boot.config.ApplicationProperties;
+import com.thefirstlineofcode.april.boot.config.AprilUtils;
+import com.thefirstlineofcode.april.boot.config.SectionalProperties;
 
 import ch.qos.logback.classic.LoggerContext;
 import ch.qos.logback.classic.joran.JoranConfigurator;
@@ -32,8 +35,10 @@ import ch.qos.logback.core.joran.spi.JoranException;
 import ch.qos.logback.core.util.StatusPrinter;
 
 public class AprilFlowers {
-	private static final String PROPERTY_NAME_APRIL_APPLICATION_LOG_LEVEL = "april.application.logLevel";
-	private static final String PROPERTY_NAME_APRIL_APPLICATION_DISABLED_PLUGINS = "april.application.disabledPlugins";
+	private static final String SECTION_NAME_APPLICATION = "application";
+	private static final String FILE_NAME_APRIL_PROPERTIES = "april.properties";
+	private static final String PROPERTY_NAME_LOG_LEVEL = "logLevel";
+	private static final String PROPERTY_NAME_DISABLED_PLUGINS = "disabledPlugins";
 	private static final String OPTION_NAME_PLUGINS_DIRECTORIES = "plugins-directories";
 	private static final String DEFAULT_PLUGINS_DIRECTORY_NAME = "plugins";
 	private static final String OPTION_NAME_RUNTIME_MODE = "runtime-mode";
@@ -41,7 +46,8 @@ public class AprilFlowers {
 	private Path applicationHome;
 	private Path[] pluginsDirectories;
 	
-	private Map<String, Object> applicationProperties;
+	private SectionalProperties aprilProperties;
+	private ApplicationProperties applicationProperties;
 	private boolean noPlugins;
 	private RuntimeMode runtimeMode;
 	private String[] disabledPlugins;
@@ -121,9 +127,6 @@ public class AprilFlowers {
 	}
 
 	private void processApplicationContext(ConfigurableApplicationContext appContext) {
-		AnnotationConfigRegistry configRegistry = (AnnotationConfigRegistry)appContext;
-		registerSystemConfigurations(configRegistry);
-		
 		if (noPlugins)
 			return;
 				
@@ -131,19 +134,22 @@ public class AprilFlowers {
 		AprilPluginManager pluginManager = new AprilPluginManager(pluginsDirectories);
 		pluginManager.loadPlugins();
 		
-		for (String disabledPlugin : disabledPlugins) {
-			PluginWrapper plugin = pluginManager.getPlugin(disabledPlugin);
-			if (plugin == null)
-				throw new RuntimeException(String.format("Can't disable plugin '%s'. The plugin doesn't exist.", disabledPlugin));
-			
-			plugin.setPluginState(PluginState.DISABLED);
+		if (disabledPlugins != null) {			
+			for (String disabledPlugin : disabledPlugins) {
+				PluginWrapper plugin = pluginManager.getPlugin(disabledPlugin);
+				if (plugin == null)
+					throw new RuntimeException(String.format("Can't disable plugin '%s'. The plugin doesn't exist.", disabledPlugin));
+				
+				plugin.setPluginState(PluginState.DISABLED);
+			}
 		}
 		
 		pluginManager.startPlugins();
 		
 		ConfigurableListableBeanFactory beanFactory = (ConfigurableListableBeanFactory)appContext.getBeanFactory();
-		beanFactory.addBeanPostProcessor(new AprilBeanPostProcessor(applicationHome, applicationProperties, pluginManager));
+		beanFactory.addBeanPostProcessor(new AprilBeanPostProcessor(applicationHome, aprilProperties, applicationProperties, pluginManager));
 		
+		AnnotationConfigRegistry configRegistry = (AnnotationConfigRegistry)appContext;
 		ClassLoader[] pluginClassLoaders = registerSpringConfigurations(configRegistry, pluginManager);
 		if (pluginClassLoaders != null) {
 			appContext.setClassLoader(new CompositeClassLoader(getNewAppContextClassLoaders(appContext, pluginClassLoaders)));
@@ -187,46 +193,39 @@ public class AprilFlowers {
 	
 	protected void registerPredefinedSpringConfigurations(AnnotationConfigRegistry configRegistry) {}
 	
-	protected void registerSystemConfigurations(AnnotationConfigRegistry configRegistry) {
-		configRegistry.register(BootConfiguration.class);
-	}
-	
 	protected void processEnvironment(ConfigurableEnvironment environment) {
-		Iterator<PropertySource<?>> propertySourcesIter  = environment.getPropertySources().iterator();
-		while (propertySourcesIter.hasNext()) {
-			PropertySource<?> propertySource = propertySourcesIter.next();
-			if (propertySource.getName().indexOf("application.properties") != -1) {
-				if (!(propertySource instanceof MapPropertySource))
-					throw new RuntimeException("Application properties source isn't a MapPropertySource!!!");
-				
-				applicationProperties= ((MapPropertySource)propertySource).getSource();
-				break;
+		applicationProperties = new ApplicationProperties();
+		
+		Path pAprilProperties = applicationHome.resolve(FILE_NAME_APRIL_PROPERTIES);
+		aprilProperties = new SectionalProperties();
+		if (Files.exists(pAprilProperties)) {
+			try {
+				aprilProperties.load(new FileInputStream(pAprilProperties.toFile()));
+			} catch (IOException e) {
+				throw new RuntimeException(String.format("Failed load properties from %s.",
+						pAprilProperties.toFile().getAbsolutePath()), e);
 			}
+			
+			Properties appProperties = aprilProperties.getSection(SECTION_NAME_APPLICATION);
+			configureApplicationProperties(applicationProperties, appProperties);
 		}
 		
-		if (applicationProperties == null)
-			return;
-		
-		String sDisabledPlugins = getPropertyValue(PROPERTY_NAME_APRIL_APPLICATION_DISABLED_PLUGINS);
-		if (sDisabledPlugins == null) {			
-			disabledPlugins = new String[0];
-		} else {			
-			disabledPlugins = sDisabledPlugins.split(",");
-			for (int i = 0; i < disabledPlugins.length; i++) {
-				disabledPlugins[i] = disabledPlugins[i].trim();
-			}
-		}
-		
-		String logLevel = getPropertyValue(PROPERTY_NAME_APRIL_APPLICATION_LOG_LEVEL);
-		configureLog(logLevel);
+		disabledPlugins = applicationProperties.getDisabledPlugins();
+		configureLog(applicationProperties.getLogLevel());
 	}
 
-	private String getPropertyValue(String key) {
-		OriginTrackedValue value = (OriginTrackedValue)applicationProperties.get(key);
-		if (value == null)
-			return null;
+	private void configureApplicationProperties(ApplicationProperties applicationProperties,
+			Properties appProperties) {
+		if (appProperties == null)
+			return;
 		
-		return (String)value.getValue();
+		String disabledPlugins = appProperties.getProperty(PROPERTY_NAME_DISABLED_PLUGINS);
+		if (disabledPlugins != null)
+			applicationProperties.setDisabledPlugins(AprilUtils.stringToArray(disabledPlugins));
+		
+		String logLevel = appProperties.getProperty(PROPERTY_NAME_LOG_LEVEL);
+		if (logLevel != null)
+			applicationProperties.setLogLevel(logLevel);
 	}
 	
 	private void configureLog(String logLevel) {
@@ -258,7 +257,7 @@ public class AprilFlowers {
 			configurator.setContext(lc);
 			configurator.doConfigure(url);
 		} catch (JoranException e) {
-			// ignore, StatusPrinter will handle this
+			// Ignore. StatusPrinter will handle this.
 		}
 		
 	    StatusPrinter.printInCaseOfErrorsOrWarnings(lc);

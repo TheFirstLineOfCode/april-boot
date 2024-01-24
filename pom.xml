@@ -103,6 +103,14 @@
 				<scope>import</scope>
 			</dependency>
 		</dependencies>  
-	</dependencyManagement>  
+	</dependencyManagement>
+	
+	<distributionManagement>
+                <repository>
+                        <id>com.thefirstlineofcode.releases</id>
+                        <name>TheFirstLineOfCode Repository - Releases</name>
+                        <url>http://120.25.166.188:9090/repository/maven-releases/</url>
+                </repository>
+        </distributionManagement>
 </project>
 
